@@ -151,7 +151,7 @@ def get_playlist_songs_by_ID(playlistID):
     url = 'http://music.163.com/api/playlist/detail?id=%d' % playlistID
     resp = urllib2.urlopen(url)
     songs = json.loads(resp.read())
-    return songs['result']['tracks']
+    return songs['result']
 
 
 def save_song_to_disk(song, folder):
@@ -230,28 +230,59 @@ def download_album_by_ID(albumID, folder='.'):
 
 
 def download_playlist_by_ID(playlistID, folder='.'):
-    songs = get_playlist_songs_by_ID(playlistID)
-    if not songs:
+    playlistInfo = get_playlist_songs_by_ID(playlistID)
+    if not playlistInfo:
         print 'Not found'
         return
-    
-    folder = os.path.join(folder, 'Playlist'+str(playlistID))
+    print playlistInfo
+    folder = os.path.join(folder, 'Playlist_'+str(playlistInfo['name']))
 
     if not os.path.exists(folder):
         os.makedirs(folder)
+    songs=playlistInfo['tracks']
     print 'saving total %s songs....' %len(songs)
     for song in songs:
         save_song_to_disk(song, folder)
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print 'give album name as parameter!'
+    if len(sys.argv) < 3:
+        print 'parameter help:'
+        print 'python NeteaseCloudMusic.py option1 option2 [option3]'
+        print 'option1: type; option2: query string; optipon3: file path'
+        print 'search song  & download: option1 = song  , option2 = <song Name> '
+        print 'search album & download: option1 = album , option2 = <album Name> '
+        print 'download album by ID:    option1 = aid   , option2 = <album ID> '
+        print 'download playlist by ID: option1 = pid   , option2 = <playlist ID> '
         sys.exit(0)
-    if len(sys.argv)==2:
-        download_album_by_search(sys.argv[1], '.')
+        
+    if sys.argv[1]=='aid':
+        if len(sys.argv)==3:
+            download_album_by_ID(int(sys.argv[2]))
+        else:
+            download_album_by_ID(int(sys.argv[2]), sys.argv[3])
+        
+    elif sys.argv[1]=='album':
+        if len(sys.argv)==3:
+            download_album_by_search(sys.argv[2])
+        else:
+            download_album_by_search(sys.argv[2], sys.argv[3])
+            
+    elif sys.argv[1]=='pid':
+        if len(sys.argv)==3:
+            download_playlist_by_ID(int(sys.argv[2]))
+        else:
+            download_playlist_by_ID(int(sys.argv[2]), sys.argv[3])
+            
+    elif sys.argv[1]=='song':
+        if len(sys.argv)==3:
+            download_song_by_search(sys.argv[2])
+        else:
+            download_song_by_search(sys.argv[2], sys.argv[3])
+    
     else:
-        download_album_by_search(sys.argv[1], sys.argv[2])
+        print 'give correct parameter'
+        sys.exit(0)
     
     
     
