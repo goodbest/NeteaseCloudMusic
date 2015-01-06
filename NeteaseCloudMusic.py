@@ -234,7 +234,6 @@ def download_playlist_by_ID(playlistID, folder='.'):
     if not playlistInfo:
         print 'Not found'
         return
-    print playlistInfo
     folder = os.path.join(folder, 'Playlist_'+str(playlistInfo['name']))
 
     if not os.path.exists(folder):
