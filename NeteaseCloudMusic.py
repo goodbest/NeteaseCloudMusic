@@ -2,8 +2,15 @@
 # -*- coding: utf-8 -*-
 '''
 Created on 2013-06-07 19:28
-
 @author: Yang Junyong <yanunon@gmail.com>
+
+Modified on 2015-01-06 15:28
+@author: goodbest <lovegoodbest@gmail.com>
+
+#changelog:
+add: download album by id
+add: download playlist by id
+add: download 320k first
 '''
 
 import md5
@@ -80,8 +87,6 @@ def search_album_by_name(name):
     else:
         return None
 
-
-
 def search_song_by_name(name):
     search_url = 'http://music.163.com/api/search/get'
     params = {
@@ -128,20 +133,45 @@ def get_artist_albums(artist):
             break
     return albums
 
+
 def get_album_songs(album):
-    url = 'http://music.163.com/api/album/%d/' % album['id']
+    albumInfo=get_album_songs_by_ID(album['id'])
+    return albumInfo['album']['songs']
+
+
+def get_album_songs_by_ID(albumID):
+    url = 'http://music.163.com/api/album/%d/' % albumID
+    resp = urllib2.urlopen(url)
+    albumInfo= json.loads(resp.read())
+    return albumInfo
+    #return songs['album']['songs']
+
+
+def get_playlist_songs_by_ID(playlistID):
+    url = 'http://music.163.com/api/playlist/detail?id=%d' % playlistID
     resp = urllib2.urlopen(url)
     songs = json.loads(resp.read())
-    return songs['album']['songs']
+    return songs['result']['tracks']
+
 
 def save_song_to_disk(song, folder):
     name = song['name']
     fpath = os.path.join(folder, name+'.mp3')
     if os.path.exists(fpath):
         return
-
-    song_dfsId = str(song['bMusic']['dfsId'])
+    
+    quality=0
+    if song['hMusic']:
+        song_dfsId = str(song['hMusic']['dfsId'])
+        quality=320
+    elif song['mMusic']:
+        song_dfsId = str(song['mMusic']['dfsId'])
+        quality=160
+    else:
+        song_dfsId = str(song['lMusic']['dfsId'])
+        quality=96
     url = 'http://m%d.music.126.net/%s/%s.mp3' % (random.randrange(1, 3), encrypted_id(song_dfsId), song_dfsId)
+    print 'saving song %s, %skbps' %(song['name'], quality)
     #print '%s\t%s' % (url, name)
     #return
     resp = urllib2.urlopen(url)
@@ -149,6 +179,7 @@ def save_song_to_disk(song, folder):
     f = open(fpath, 'wb')
     f.write(data)
     f.close()
+
 
 def download_song_by_search(name, folder='.'):
     song = search_song_by_name(name)
@@ -174,10 +205,63 @@ def download_album_by_search(name, folder='.'):
         os.makedirs(folder)
 
     songs = get_album_songs(album)
+    print 'saving total %s songs....' %len(songs)
     for song in songs:
         save_song_to_disk(song, folder)
 
+
+def download_album_by_ID(albumID, folder='.'):
+    albumInfo = get_album_songs_by_ID(albumID)
+    if not albumInfo['album']:
+        print 'Not found '
+        return
+    
+    name = albumInfo['album']['name']
+    folder = os.path.join(folder, name)
+
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+
+    songs = albumInfo['album']['songs']
+    print 'saving total %s songs....' %len(songs)
+    for song in songs:
+        save_song_to_disk(song, folder)
+        
+
+
+def download_playlist_by_ID(playlistID, folder='.'):
+    songs = get_playlist_songs_by_ID(playlistID)
+    if not songs:
+        print 'Not found'
+        return
+    
+    folder = os.path.join(folder, 'Playlist'+str(playlistID))
+
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+    print 'saving total %s songs....' %len(songs)
+    for song in songs:
+        save_song_to_disk(song, folder)
+
+
 if __name__ == '__main__':
-    if len(sys.argv) < 3:
+    if len(sys.argv) < 2:
+        print 'give album name as parameter!'
         sys.exit(0)
-    download_album_by_search(sys.argv[1], sys.argv[2])
+    if len(sys.argv)==2:
+        download_album_by_search(sys.argv[1], '.')
+    else:
+        download_album_by_search(sys.argv[1], sys.argv[2])
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
