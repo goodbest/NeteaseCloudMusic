@@ -11,6 +11,7 @@ Modified on 2015-01-06 15:28
 add: download album by id
 add: download playlist by id
 add: download 320k first
+add: download artist albums
 '''
 
 import md5
@@ -21,6 +22,7 @@ import json
 import random
 import os
 import sys
+import datetime
 
 #set cookie
 cookie_opener = urllib2.build_opener()
@@ -41,22 +43,6 @@ def encrypted_id(id):
     result = result.replace('+', '-')
     return result
 
-def search_artist_by_name(name):
-    search_url = 'http://music.163.com/api/search/get'
-    params = {
-            's': name,
-            'type': 100,
-            'offset': 0,
-            'sub': 'false',
-            'limit': 10
-    }
-    params = urllib.urlencode(params)
-    resp = urllib2.urlopen(search_url, params)
-    artists = json.loads(resp.read())
-    if artists['code'] == 200 and artists['result']['artistCount'] > 0:
-        return artists['result']['artists'][0]
-    else:
-        return None
 
 def search_album_by_name(name):
     search_url = 'http://music.163.com/api/search/get'
@@ -76,7 +62,7 @@ def search_album_by_name(name):
         if result['albumCount'] > 1:
             for i in range(len(result['albums'])):
                 album = result['albums'][i]
-                print '[%2d]artist:%s\talbum:%s' % (i+1, album['artist']['name'], album['name'])
+                print '[%2d] artist: %-20s\talbum: %-50s\ttracks: %d' % (i+1, album['artist']['name'][:20], album['name'][:50], album['size'])
             select_i = int(raw_input('Select One:'))
             if select_i < 1 or select_i > len(result['albums']):
                 print 'error select'
@@ -86,6 +72,7 @@ def search_album_by_name(name):
         return result['albums'][album_id]
     else:
         return None
+
 
 def search_song_by_name(name):
     search_url = 'http://music.163.com/api/search/get'
@@ -112,18 +99,74 @@ def search_song_by_name(name):
                 return None
             else:
                 song_id = result['songs'][select_i-1]['id']
-        detail_url = 'http://music.163.com/api/song/detail?ids=[%d]' % song_id
-        resp = urllib2.urlopen(detail_url)
-        song_js = json.loads(resp.read())
-        return song_js['songs'][0]
+        
+        return get_song_by_ID(song_id)
+        # detail_url = 'http://music.163.com/api/song/detail?ids=[%d]' % song_id
+#         resp = urllib2.urlopen(detail_url)
+#         song_js = json.loads(resp.read())
+#         return song_js['songs'][0]
     else:
         return None
 
-def get_artist_albums(artist):
+
+def search_artist_by_name(name):
+    search_url = 'http://music.163.com/api/search/get'
+    params = {
+            's': name,
+            'type': 100,
+            'offset': 0,
+            'sub': 'false',
+            'limit': 10
+    }
+    params = urllib.urlencode(params)
+    resp = urllib2.urlopen(search_url, params)
+    resp_js = json.loads(resp.read())
+    if resp_js['code'] == 200 and resp_js['result']['artistCount'] > 0:
+        result = resp_js['result']
+        artist_id = 0
+        if result['artistCount'] > 1:
+            for i in range(len(result['artists'])):
+                artist = result['artists'][i]
+                print '[%2d] artist: %s \t albums: %d' % (i+1, artist['name'], artist['albumSize'])
+            select_i = int(raw_input('Select One:'))
+            if select_i < 1 or select_i > len(result['artists']):
+                print 'error select'
+                return None
+            else:
+                return result['artists'][select_i-1]
+        else:
+            return result['artists'][artist_id]
+            
+    else:
+        return None
+
+
+def get_song_by_ID(songID):
+    detail_url = 'http://music.163.com/api/song/detail?ids=[%d]' % songID
+    resp = urllib2.urlopen(detail_url)
+    song_js = json.loads(resp.read())
+    return song_js['songs'][0]
+
+
+def get_album_songs_by_ID(albumID):
+    url = 'http://music.163.com/api/album/%d/' % albumID
+    resp = urllib2.urlopen(url)
+    albumInfo= json.loads(resp.read())
+    return albumInfo
+
+
+def get_playlist_songs_by_ID(playlistID):
+    url = 'http://music.163.com/api/playlist/detail?id=%d' % playlistID
+    resp = urllib2.urlopen(url)
+    songs = json.loads(resp.read())
+    return songs['result']
+
+
+def get_artist_albums_by_ID(artistID):
     albums = []
     offset = 0
     while True:
-        url = 'http://music.163.com/api/artist/albums/%d?offset=%d&limit=50' % (artist['id'], offset)
+        url = 'http://music.163.com/api/artist/albums/%d?offset=%d&limit=50' % (artistID, offset)
         resp = urllib2.urlopen(url)
         tmp_albums = json.loads(resp.read())
         albums.extend(tmp_albums['hotAlbums'])
@@ -134,29 +177,12 @@ def get_artist_albums(artist):
     return albums
 
 
-def get_album_songs(album):
-    albumInfo=get_album_songs_by_ID(album['id'])
-    return albumInfo['album']['songs']
-
-
-def get_album_songs_by_ID(albumID):
-    url = 'http://music.163.com/api/album/%d/' % albumID
-    resp = urllib2.urlopen(url)
-    albumInfo= json.loads(resp.read())
-    return albumInfo
-    #return songs['album']['songs']
-
-
-def get_playlist_songs_by_ID(playlistID):
-    url = 'http://music.163.com/api/playlist/detail?id=%d' % playlistID
-    resp = urllib2.urlopen(url)
-    songs = json.loads(resp.read())
-    return songs['result']
-
-
 def save_song_to_disk(song, folder):
     name = song['name']
-    fpath = os.path.join(folder, name+'.mp3')
+    if song['position']:
+        fpath = os.path.join(folder, '%02d-%s.mp3' %(song['position'], name))
+    else:
+        fpath = os.path.join(folder, name+'.mp3')
     if os.path.exists(fpath):
         return
     
@@ -192,22 +218,44 @@ def download_song_by_search(name, folder='.'):
     save_song_to_disk(song, folder)
 
 
+def download_song_by_ID(songID, folder='.'):
+    song=get_song_by_ID(songID)
+    save_song_to_disk(song, folder)
+
+
 def download_album_by_search(name, folder='.'):
     album = search_album_by_name(name)
     if not album:
         print 'Not found ' + name
         return
-    
-    name = album['name']
-    folder = os.path.join(folder, name)
+    download_album_by_ID(album['id'], folder)
 
-    if not os.path.exists(folder):
-        os.makedirs(folder)
 
-    songs = get_album_songs(album)
-    print 'saving total %s songs....' %len(songs)
-    for song in songs:
-        save_song_to_disk(song, folder)
+def download_album_by_artist(name, folder='.'):
+    artistInfo= search_artist_by_name(name)
+    download_album_by_artist_ID(artistInfo['id'], folder)
+
+
+def download_album_by_artist_ID(artistID, folder='.'):
+    albums = get_artist_albums_by_ID(artistID)
+    if len(albums) > 1:
+        for i in range(len(albums)):
+            album = albums[i]
+            print '[%2d] albums: %-40s\t tracks: %d\t date: %s' % (i+1, album['name'][:40], album['size'], datetime.datetime.fromtimestamp(album['publishTime']/1000).strftime('%Y-%m-%d'))
+        select_i = str(raw_input('Select album: (seperate album number by space for multiple downloads; input 0 to download all\n')).strip()
+        if select_i == '0':
+            downlist=range(1,len(albums)+1)
+        else:
+            downlist= [int(j) for j in select_i.split(' ')]
+            for j in downlist:
+                if j < 0 or j > len(albums):
+                    print 'error select'
+                    return None
+    else:
+        downlist=[1]
+    print 'Start downloading %d albums' % len(downlist)
+    for album in downlist:
+        download_album_by_ID(albums[album-1]['id'], folder)
 
 
 def download_album_by_ID(albumID, folder='.'):
@@ -217,7 +265,8 @@ def download_album_by_ID(albumID, folder='.'):
         return
     
     name = albumInfo['album']['name']
-    folder = os.path.join(folder, name)
+    artist = albumInfo['album']['artist']['name']
+    folder = os.path.join(folder, artist+'-'+name)
 
     if not os.path.exists(folder):
         os.makedirs(folder)
@@ -226,7 +275,6 @@ def download_album_by_ID(albumID, folder='.'):
     print 'saving total %s songs....' %len(songs)
     for song in songs:
         save_song_to_disk(song, folder)
-        
 
 
 def download_playlist_by_ID(playlistID, folder='.'):
@@ -234,7 +282,7 @@ def download_playlist_by_ID(playlistID, folder='.'):
     if not playlistInfo:
         print 'Not found'
         return
-    folder = os.path.join(folder, 'Playlist_'+str(playlistInfo['name']))
+    folder = os.path.join(folder, 'Playlist-'+str(playlistInfo['name']))
 
     if not os.path.exists(folder):
         os.makedirs(folder)
@@ -248,14 +296,18 @@ if __name__ == '__main__':
     if len(sys.argv) < 3:
         print 'parameter help:'
         print 'python NeteaseCloudMusic.py option1 option2 [option3]'
-        print 'option1: type; option2: query string; optipon3: file path'
-        print 'search song  & download: option1 = song  , option2 = <song Name> '
-        print 'search album & download: option1 = album , option2 = <album Name> '
-        print 'download album by ID:    option1 = aid   , option2 = <album ID> '
-        print 'download playlist by ID: option1 = pid   , option2 = <playlist ID> '
+        print 'option1: type; option2: query string; option3: file path'
+        print 'search song  & download:     option1 = song    , option2 = <song Name> '
+        print 'search album & download:     option1 = album   , option2 = <album Name> '
+        print 'search artist& download:     option1 = art     , option2 = <artist Name> '
+        print 'download song  by ID:        option1 = sid     , option2 = <song ID> '
+        print 'download album by ID:        option1 = albumid , option2 = <album ID> '
+        print 'download album by artist ID: option1 = artid   , option2 = <artist ID> '
+        print 'download playlist by ID:     option1 = pid     , option2 = <playlist ID> '
+        
         sys.exit(0)
         
-    if sys.argv[1]=='aid':
+    if sys.argv[1]=='albumid':
         if len(sys.argv)==3:
             download_album_by_ID(int(sys.argv[2]))
         else:
@@ -266,6 +318,18 @@ if __name__ == '__main__':
             download_album_by_search(sys.argv[2])
         else:
             download_album_by_search(sys.argv[2], sys.argv[3])
+            
+    elif sys.argv[1]=='art':
+        if len(sys.argv)==3:
+            download_album_by_artist(sys.argv[2])
+        else:
+            download_album_by_artist(sys.argv[2], sys.argv[3])
+    
+    elif sys.argv[1]=='artid':
+        if len(sys.argv)==3:
+            download_album_by_artist_ID(int(sys.argv[2]))
+        else:
+            download_album_by_artist_ID(int(sys.argv[2]), sys.argv[3])
             
     elif sys.argv[1]=='pid':
         if len(sys.argv)==3:
@@ -278,7 +342,13 @@ if __name__ == '__main__':
             download_song_by_search(sys.argv[2])
         else:
             download_song_by_search(sys.argv[2], sys.argv[3])
-    
+
+    elif sys.argv[1]=='sid':
+        if len(sys.argv)==3:
+            download_song_by_ID(int(sys.argv[2]))
+        else:
+            download_song_by_ID(int(sys.argv[2]), sys.argv[3])
+
     else:
         print 'give correct parameter'
         sys.exit(0)
