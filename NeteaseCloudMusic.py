@@ -186,7 +186,6 @@ def save_song_to_disk(song, folder):
     name = song['name']
     if song['position']:
         fpath = os.path.join(folder, '%02d-%s.mp3' %(song['position'], name.replace('/',':')))
-        print fpath
     else:
         fpath = os.path.join(folder, name+'.mp3')
     if os.path.exists(fpath):
