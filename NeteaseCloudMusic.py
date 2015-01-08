@@ -12,6 +12,7 @@ add: download album by id
 add: download playlist by id
 add: download 320k first
 add: download artist albums
+add: download mv by id
 '''
 
 import md5
@@ -101,10 +102,7 @@ def search_song_by_name(name):
                 song_id = result['songs'][select_i-1]['id']
         
         return get_song_by_ID(song_id)
-        # detail_url = 'http://music.163.com/api/song/detail?ids=[%d]' % song_id
-#         resp = urllib2.urlopen(detail_url)
-#         song_js = json.loads(resp.read())
-#         return song_js['songs'][0]
+
     else:
         return None
 
@@ -146,6 +144,13 @@ def get_song_by_ID(songID):
     resp = urllib2.urlopen(detail_url)
     song_js = json.loads(resp.read())
     return song_js['songs'][0]
+
+
+def get_mv_by_ID(mvID):
+    detail_url = 'http://music.163.com/api/mv/detail?id=%d' % mvID
+    resp = urllib2.urlopen(detail_url)
+    mv = json.loads(resp.read())
+    return mv['data']
 
 
 def get_album_songs_by_ID(albumID):
@@ -207,6 +212,26 @@ def save_song_to_disk(song, folder):
     f.close()
 
 
+def save_mv_to_disk(mv, folder):
+    name = mv['name']
+    fpath = os.path.join(folder, '%s-%s.mp4' %(mv['artistName'], name))
+    if os.path.exists(fpath):
+        return
+    
+    best_bitrate=0
+    for bitrate in mv['brs'].keys():
+        if int(bitrate) > int(best_bitrate):
+            best_bitrate = bitrate
+    video_url = mv['brs'][best_bitrate]
+    print 'saving mv %s, %sp' %(name, best_bitrate)
+
+    resp = urllib2.urlopen(video_url)
+    data = resp.read()
+    f = open(fpath, 'wb')
+    f.write(data)
+    f.close()
+
+
 def download_song_by_search(name, folder='.'):
     song = search_song_by_name(name)
     if not song:
@@ -221,6 +246,11 @@ def download_song_by_search(name, folder='.'):
 def download_song_by_ID(songID, folder='.'):
     song=get_song_by_ID(songID)
     save_song_to_disk(song, folder)
+    
+
+def download_mv_by_ID(mvID, folder='.'):
+    mvInfo=get_mv_by_ID(mvID)
+    save_mv_to_disk(mvInfo, folder)
 
 
 def download_album_by_search(name, folder='.'):
@@ -301,6 +331,7 @@ if __name__ == '__main__':
         print 'search album & download:     option1 = album   , option2 = <album Name> '
         print 'search artist& download:     option1 = art     , option2 = <artist Name> '
         print 'download song  by ID:        option1 = sid     , option2 = <song ID> '
+        print 'download mv    by ID:        option1 = mvid    , option2 = <mv ID> '
         print 'download album by ID:        option1 = albumid , option2 = <album ID> '
         print 'download album by artist ID: option1 = artid   , option2 = <artist ID> '
         print 'download playlist by ID:     option1 = pid     , option2 = <playlist ID> '
@@ -349,19 +380,13 @@ if __name__ == '__main__':
         else:
             download_song_by_ID(int(sys.argv[2]), sys.argv[3])
 
+    elif sys.argv[1]=='mvid':
+        if len(sys.argv)==3:
+            download_mv_by_ID(int(sys.argv[2]))
+        else:
+            download_mv_by_ID(int(sys.argv[2]), sys.argv[3])
     else:
         print 'give correct parameter'
         sys.exit(0)
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     
     
