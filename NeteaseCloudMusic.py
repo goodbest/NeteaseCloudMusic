@@ -185,7 +185,8 @@ def get_artist_albums_by_ID(artistID):
 def save_song_to_disk(song, folder):
     name = song['name']
     if song['position']:
-        fpath = os.path.join(folder, '%02d-%s.mp3' %(song['position'], name))
+        fpath = os.path.join(folder, '%02d-%s.mp3' %(song['position'], name.replace('/',':')))
+        print fpath
     else:
         fpath = os.path.join(folder, name+'.mp3')
     if os.path.exists(fpath):
@@ -294,7 +295,7 @@ def download_album_by_ID(albumID, folder='.'):
         print 'Not found '
         return
     
-    name = albumInfo['album']['name']
+    name = albumInfo['album']['name'].replace('/',':')
     artist = albumInfo['album']['artist']['name']
     folder = os.path.join(folder, artist+'-'+name)
 
